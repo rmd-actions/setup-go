@@ -13,7 +13,7 @@ This action sets up a Go environment for use in GitHub Actions by:
 
 ```yaml
 steps:
-  - uses: actions/checkout@v5
+  - uses: actions/checkout@v6
   - uses: actions/setup-go@v6
     with:
       go-version: '1.23'
@@ -24,24 +24,18 @@ steps:
 
 ### V6 Changes
 
-#### Node Runtime Upgrade
+**Node Runtime Upgrade**
 - **Upgraded from Node 20 to Node 24**
 - ⚠️ **Action Required**: Ensure your runner is on version v2.327.1 or later for compatibility
 - See [Release Notes](https://github.com/actions/runner/releases/tag/v2.327.1) for more details
 
-#### Enhanced Go Toolchain Management
+**Enhanced Go Toolchain Management**
 
-V6 introduces significant improvements for reliable and consistent Go version selection:
+V6 introduces significant improvements for reliable and consistent Go version selection. Supports both `go` and `toolchain` directives in `go.mod`. If the `toolchain` directive is present, its version is used; otherwise, the action falls back to the go directive.
+   
+**Cache Key Update**
 
-**Toolchain Directive Support**
-Now correctly interprets both `go` and `toolchain` directives from `go.mod`:
-```go
-go 1.23.0           // Minimum required version
-toolchain go1.23.2  // V6 uses this exact version
-```
-
-**Intelligent Caching**
-Cache keys now incorporate the `toolchain` directive version from `go.mod`, eliminating cache conflicts when switching between different toolchain versions within the same Go minor release.
+By default, caching for Go modules now relies on `go.mod`. To use `go.sum`, configure the `cache-dependency-path` input.
 
 For more details, see the [full release notes](https://github.com/actions/setup-go/releases/tag/v6.0.0).
 
@@ -67,7 +61,7 @@ To change the default behavior, use the `check-latest` input.
 
 ```yaml
 steps:
-  - uses: actions/checkout@v5
+  - uses: actions/checkout@v6
   - uses: actions/setup-go@v6
     with:
       go-version: '1.23'
@@ -80,7 +74,7 @@ steps:
 
 ```yaml
 steps:
-  - uses: actions/checkout@v5
+  - uses: actions/checkout@v6
   - uses: actions/setup-go@v6
     with:
       go-version: '^1.23.1' # The Go version to download (if necessary) and use.
@@ -89,7 +83,7 @@ steps:
 
 ```yaml
 steps:
-  - uses: actions/checkout@v5
+  - uses: actions/checkout@v6
   - uses: actions/setup-go@v6
     with:
       go-version: '>=1.22.0'
@@ -107,7 +101,7 @@ steps:
 ```yaml
 # RC version
 steps:
-  - uses: actions/checkout@v5
+  - uses: actions/checkout@v6
   - uses: actions/setup-go@v6
     with:
        go-version: '1.24.0-rc.1' # The Go version to download (if necessary) and use
@@ -117,7 +111,7 @@ steps:
 ```yaml
 # Beta version
 steps:
-  - uses: actions/checkout@v5
+  - uses: actions/checkout@v6
   - uses: actions/setup-go@v6
     with:
       go-version: '1.23.0-beta.1' # The Go version to download (if necessary) and use
@@ -131,7 +125,7 @@ steps:
 If `stable` is provided, action will get the latest stable version from the [go-versions](https://github.com/actions/go-versions/blob/main/versions-manifest.json) repository manifest.
 ```yaml
 steps:
-  - uses: actions/checkout@v5
+  - uses: actions/checkout@v6
   - uses: actions/setup-go@v6
     with:
       go-version: 'stable' # Latest stable version
@@ -143,7 +137,7 @@ steps:
 If `oldstable` is provided, when the current release is 1.23.x, the action will resolve version as 1.22.x, where x is the latest patch release.
 ```yaml
 steps:
-  - uses: actions/checkout@v5
+  - uses: actions/checkout@v6
   - uses: actions/setup-go@v6
     with:
       go-version: 'oldstable' # Previous stable version
@@ -164,7 +158,7 @@ Automatically detect the Go version from your project's `go.mod` file:
 
 ```yaml
 steps:
-  - uses: actions/checkout@v5
+  - uses: actions/checkout@v6
   - uses: actions/setup-go@v6
     with:
       go-version-file: 'go.mod'
@@ -182,7 +176,7 @@ Use the Go version specified in your `go.work` file:
 
 ```yaml
 steps:
-  - uses: actions/checkout@v5
+  - uses: actions/checkout@v6
   - uses: actions/setup-go@v6
     with:
       go-version-file: 'go.work'
@@ -195,7 +189,7 @@ Read the Go version from a `.go-version` file:
 
 ```yaml
 steps:
-  - uses: actions/checkout@v5
+  - uses: actions/checkout@v6
   - uses: actions/setup-go@v6
     with:
       go-version-file: '.go-version'
@@ -208,7 +202,7 @@ Use the Go version from an [`.tool-versions`](https://asdf-vm.com/manage/configu
 
 ```yaml
 steps:
-  - uses: actions/checkout@v5
+  - uses: actions/checkout@v6
   - uses: actions/setup-go@v6
     with:
       go-version-file: '.tool-versions'
@@ -221,7 +215,7 @@ The action searches for version files relative to the repository root by default
 
 ```yaml
 steps:
-  - uses: actions/checkout@v5
+  - uses: actions/checkout@v6
   - uses: actions/setup-go@v6
     with:
       go-version-file: 'path/to/.go-version'
@@ -239,7 +233,7 @@ When `check-latest: true`, the action verifies if your cached Go version is the 
 
 ```yaml
 steps:
-  - uses: actions/checkout@v5
+  - uses: actions/checkout@v6
   - uses: actions/setup-go@v6
     with:
       go-version: '1.23'
@@ -257,11 +251,11 @@ The action features integrated caching for Go modules and build outputs. Built o
 
 #### Automatic Caching
 
-Default behavior: Searches for `go.sum` in the repository root and uses its hash for the cache key.
+Default behavior: Searches for `go.mod` in the repository root and uses its hash for the cache key.
 
 ```yaml
 steps:
-  - uses: actions/checkout@v5
+  - uses: actions/checkout@v6
   - uses: actions/setup-go@v6
     with:
       go-version: '1.23'
@@ -280,7 +274,7 @@ For advanced scenarios, use `cache-dependency-path` to specify:
 ```yaml
 # Example: Monorepo with multiple go.sum files
 steps:
-  - uses: actions/checkout@v5
+  - uses: actions/checkout@v6
   - uses: actions/setup-go@v6
     with:
       go-version: '1.23'
@@ -294,7 +288,7 @@ steps:
 ```yaml
 # Example: Using glob patterns to match all go.sum files
 steps:
-  - uses: actions/checkout@v5
+  - uses: actions/checkout@v6
   - uses: actions/setup-go@v6
     with:
       go-version: '1.23'
@@ -306,7 +300,7 @@ steps:
 
 ```yaml
 steps:
-  - uses: actions/checkout@v5
+  - uses: actions/checkout@v6
   - uses: actions/setup-go@v6
     with:
       go-version: '1.23'
@@ -368,7 +362,7 @@ jobs:
             path: |
               ${{ env.GO_MOD_CACHE }}
               ${{ env.GO_BUILD_CACHE }}
-            key: setup-go-${{ runner.os }}-${{ env.ARCH }}-${{ env.CACHE_OS_SUFFIX }}go-${{ steps.setup-go.outputs.go-version }}-${{ hashFiles('**/go.sum') }}
+            key: setup-go-${{ runner.os }}-${{ env.ARCH }}-${{ env.CACHE_OS_SUFFIX }}go-${{ steps.setup-go.outputs.go-version }}-${{ hashFiles('**/go.mod') }}
         - name: Download modules
           run: go mod download
         - name: Build
@@ -390,7 +384,7 @@ jobs:
       matrix:
         go-version: ['1.21', '1.22', '1.23']
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: actions/setup-go@v6
         with:
           go-version: ${{ matrix.go-version }}
