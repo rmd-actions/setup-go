@@ -10,6 +10,7 @@ import cp from 'child_process';
 import fs from 'fs';
 import os from 'os';
 import {Architecture} from './types.js';
+import {Outputs} from './constants.js';
 
 export async function run() {
   try {
@@ -21,7 +22,6 @@ export async function run() {
     setGoToolchain();
 
     const cache = core.getBooleanInput('cache');
-    core.info(`Setup go version spec ${versionSpec}`);
 
     let arch = core.getInput('architecture') as Architecture;
 
@@ -30,41 +30,48 @@ export async function run() {
     }
 
     if (versionSpec) {
-      const token = core.getInput('token');
-      const auth = !token ? undefined : `token ${token}`;
+      core.startGroup('Installed version');
+      try {
+        core.info(`Setup go version spec ${versionSpec}`);
 
-      const checkLatest = core.getBooleanInput('check-latest');
+        const token = core.getInput('token');
+        const auth = !token ? undefined : `token ${token}`;
 
-      const goDownloadBaseUrl =
-        core.getInput('go-download-base-url') ||
-        process.env['GO_DOWNLOAD_BASE_URL'] ||
-        undefined;
+        const checkLatest = core.getBooleanInput('check-latest');
 
-      if (goDownloadBaseUrl) {
-        core.info(`Using custom Go download base URL: ${goDownloadBaseUrl}`);
+        const goDownloadBaseUrl =
+          core.getInput('go-download-base-url') ||
+          process.env['GO_DOWNLOAD_BASE_URL'] ||
+          undefined;
+
+        if (goDownloadBaseUrl) {
+          core.info(`Using custom Go download base URL: ${goDownloadBaseUrl}`);
+        }
+
+        const installDir = await installer.getGo(
+          versionSpec,
+          checkLatest,
+          auth,
+          arch,
+          goDownloadBaseUrl
+        );
+
+        const installDirVersion = path.basename(path.dirname(installDir));
+
+        core.addPath(path.join(installDir, 'bin'));
+        core.info('Added go to the path');
+
+        const version = installer.makeSemver(installDirVersion);
+        // Go versions less than 1.9 require GOROOT to be set
+        if (semver.lt(version, '1.9.0')) {
+          core.info('Setting GOROOT for Go version < 1.9');
+          core.exportVariable('GOROOT', installDir);
+        }
+
+        core.info(`Successfully set up Go version ${versionSpec}`);
+      } finally {
+        core.endGroup();
       }
-
-      const installDir = await installer.getGo(
-        versionSpec,
-        checkLatest,
-        auth,
-        arch,
-        goDownloadBaseUrl
-      );
-
-      const installDirVersion = path.basename(path.dirname(installDir));
-
-      core.addPath(path.join(installDir, 'bin'));
-      core.info('Added go to the path');
-
-      const version = installer.makeSemver(installDirVersion);
-      // Go versions less than 1.9 require GOROOT to be set
-      if (semver.lt(version, '1.9.0')) {
-        core.info('Setting GOROOT for Go version < 1.9');
-        core.exportVariable('GOROOT', installDir);
-      }
-
-      core.info(`Successfully set up Go version ${versionSpec}`);
     } else {
       core.info(
         '[warning]go-version input was not specified. The action will try to use pre-installed version.'
@@ -76,6 +83,11 @@ export async function run() {
 
     const goPath = await io.which('go');
     const goVersion = (cp.execSync(`${goPath} version`) || '').toString();
+    const goEnvJson = readGoEnv(goPath);
+
+    if (goEnvJson) {
+      setGoEnvOutputs(goEnvJson);
+    }
 
     if (cache && isCacheFeatureAvailable()) {
       const packageManager = 'default';
@@ -111,6 +123,57 @@ export async function run() {
   } catch (error) {
     core.setFailed((error as Error).message);
   }
+}
+
+export function readGoEnv(goPath: string): Record<string, string> | undefined {
+  try {
+    const rawGoEnv = cp.execFileSync(goPath, ['env', '-json'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe']
+    });
+    const parsed: unknown = JSON.parse(rawGoEnv);
+
+    if (
+      typeof parsed !== 'object' ||
+      parsed === null ||
+      Array.isArray(parsed)
+    ) {
+      throw new Error("'go env -json' did not return a JSON object");
+    }
+
+    return parsed as Record<string, string>;
+  } catch (error) {
+    core.info(
+      `Unable to read 'go env -json', the Go environment outputs will not be set: ${
+        (error as Error).message
+      }`
+    );
+    return undefined;
+  }
+}
+
+const goEnvOutputs: ReadonlyArray<[Outputs, string]> = [
+  [Outputs.GoPath, 'GOPATH'],
+  [Outputs.GoBin, 'GOBIN'],
+  [Outputs.GoRoot, 'GOROOT'],
+  [Outputs.GoCache, 'GOCACHE'],
+  [Outputs.GoModCache, 'GOMODCACHE'],
+  [Outputs.GoOs, 'GOOS'],
+  [Outputs.GoArch, 'GOARCH'],
+  [Outputs.GoToolDir, 'GOTOOLDIR']
+];
+
+export function setGoEnvOutputs(goEnv: Record<string, string>): void {
+  for (const [output, variable] of goEnvOutputs) {
+    core.setOutput(output, goEnv[variable] ?? '');
+  }
+
+  core.setOutput(Outputs.GoBinPath, goEnv['GOBIN'] || goPathBin(goEnv));
+}
+
+function goPathBin(goEnv: Record<string, string>): string {
+  const goPath = (goEnv['GOPATH'] ?? '').split(path.delimiter)[0];
+  return goPath ? path.join(goPath, 'bin') : '';
 }
 
 export async function addBinToPath(): Promise<boolean> {
