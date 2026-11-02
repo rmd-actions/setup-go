@@ -100441,7 +100441,18 @@ var State;
 var Outputs;
 (function (Outputs) {
     Outputs["CacheHit"] = "cache-hit";
+    Outputs["GoBinPath"] = "go-bin-path";
 })(Outputs || (Outputs = {}));
+const GO_ENV_OUTPUTS = [
+    'GOPATH',
+    'GOBIN',
+    'GOROOT',
+    'GOCACHE',
+    'GOMODCACHE',
+    'GOOS',
+    'GOARCH',
+    'GOTOOLDIR'
+];
 
 ;// CONCATENATED MODULE: ./src/package-managers.ts
 const supportedPackageManagers = {
@@ -100567,6 +100578,7 @@ const findDependencyFile = (packageManager) => {
 
 
 
+
 async function run() {
     try {
         //
@@ -100616,6 +100628,10 @@ async function run() {
         core_debug(`add bin ${added}`);
         const goPath = await which('go');
         const goVersion = (external_child_process_default().execSync(`${goPath} version`) || '').toString();
+        const goEnvJson = readGoEnv(goPath);
+        if (goEnvJson) {
+            setGoEnvOutputs(goEnvJson);
+        }
         if (cache && isCacheFeatureAvailable()) {
             const packageManager = 'default';
             const cacheDependencyPath = getInput('cache-dependency-path');
@@ -100640,6 +100656,35 @@ async function run() {
     catch (error) {
         setFailed(error.message);
     }
+}
+function readGoEnv(goPath) {
+    try {
+        const rawGoEnv = external_child_process_default().execFileSync(goPath, ['env', '-json'], {
+            encoding: 'utf8',
+            stdio: ['ignore', 'pipe', 'pipe']
+        });
+        const parsed = JSON.parse(rawGoEnv);
+        if (typeof parsed !== 'object' ||
+            parsed === null ||
+            Array.isArray(parsed)) {
+            throw new Error("'go env -json' did not return a JSON object");
+        }
+        return parsed;
+    }
+    catch (error) {
+        core_info(`Unable to read 'go env -json', the Go environment outputs will not be set: ${error.message}`);
+        return undefined;
+    }
+}
+function setGoEnvOutputs(goEnv) {
+    for (const name of GO_ENV_OUTPUTS) {
+        setOutput(name, goEnv[name] ?? '');
+    }
+    setOutput(Outputs.GoBinPath, goEnv.GOBIN || goPathBin(goEnv));
+}
+function goPathBin(goEnv) {
+    const goPath = (goEnv.GOPATH ?? '').split((external_path_default()).delimiter)[0];
+    return goPath ? external_path_default().join(goPath, 'bin') : '';
 }
 async function addBinToPath() {
     let added = false;

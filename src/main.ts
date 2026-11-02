@@ -10,6 +10,7 @@ import cp from 'child_process';
 import fs from 'fs';
 import os from 'os';
 import {Architecture} from './types.js';
+import {GO_ENV_OUTPUTS, GoEnv, Outputs} from './constants.js';
 
 export async function run() {
   try {
@@ -82,6 +83,11 @@ export async function run() {
 
     const goPath = await io.which('go');
     const goVersion = (cp.execSync(`${goPath} version`) || '').toString();
+    const goEnvJson = readGoEnv(goPath);
+
+    if (goEnvJson) {
+      setGoEnvOutputs(goEnvJson);
+    }
 
     if (cache && isCacheFeatureAvailable()) {
       const packageManager = 'default';
@@ -117,6 +123,46 @@ export async function run() {
   } catch (error) {
     core.setFailed((error as Error).message);
   }
+}
+
+export function readGoEnv(goPath: string): GoEnv | undefined {
+  try {
+    const rawGoEnv = cp.execFileSync(goPath, ['env', '-json'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe']
+    });
+    const parsed: unknown = JSON.parse(rawGoEnv);
+
+    if (
+      typeof parsed !== 'object' ||
+      parsed === null ||
+      Array.isArray(parsed)
+    ) {
+      throw new Error("'go env -json' did not return a JSON object");
+    }
+
+    return parsed as GoEnv;
+  } catch (error) {
+    core.info(
+      `Unable to read 'go env -json', the Go environment outputs will not be set: ${
+        (error as Error).message
+      }`
+    );
+    return undefined;
+  }
+}
+
+export function setGoEnvOutputs(goEnv: GoEnv): void {
+  for (const name of GO_ENV_OUTPUTS) {
+    core.setOutput(name, goEnv[name] ?? '');
+  }
+
+  core.setOutput(Outputs.GoBinPath, goEnv.GOBIN || goPathBin(goEnv));
+}
+
+function goPathBin(goEnv: GoEnv): string {
+  const goPath = (goEnv.GOPATH ?? '').split(path.delimiter)[0];
+  return goPath ? path.join(goPath, 'bin') : '';
 }
 
 export async function addBinToPath(): Promise<boolean> {

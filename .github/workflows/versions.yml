@@ -43,6 +43,31 @@ jobs:
       - name: Verify Go
         run: go version
 
+  go-env-outputs:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Setup Go
+        id: setup-go
+        uses: ./
+        with:
+          go-version: stable
+      - name: Show Go environment outputs
+        run: |
+          echo "GOPATH:       ${{ steps.setup-go.outputs.GOPATH }}"
+          echo "GOBIN:        ${{ steps.setup-go.outputs.GOBIN }}"
+          echo "go-bin-path:  ${{ steps.setup-go.outputs.go-bin-path }}"
+          echo "GOROOT:       ${{ steps.setup-go.outputs.GOROOT }}"
+          echo "GOCACHE:      ${{ steps.setup-go.outputs.GOCACHE }}"
+          echo "GOMODCACHE:   ${{ steps.setup-go.outputs.GOMODCACHE }}"
+          echo "GOOS:         ${{ steps.setup-go.outputs.GOOS }}"
+          echo "GOARCH:       ${{ steps.setup-go.outputs.GOARCH }}"
+          echo "GOTOOLDIR:    ${{ steps.setup-go.outputs.GOTOOLDIR }}"
+
   aliases-arch:
     runs-on: ${{ matrix.os }}
     strategy:
